@@ -46,12 +46,9 @@ copy .env.example .env
 Edit `backend/.env`:
 
 ```env
-DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5432/education_center"
-CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
-SECRET_KEY="change-this-secret-in-production"
-BOOTSTRAP_ADMIN_EMAIL="admin@edupro.uz"
-BOOTSTRAP_ADMIN_PASSWORD="Admin12345"
-```
+SECRET_KEY="your-secure-secret-key"
+BOOTSTRAP_ADMIN_EMAIL="your-admin-email@example.com"
+BOOTSTRAP_ADMIN_PASSWORD="your-secure-admin-password"
 
 Create the PostgreSQL database, then run migrations:
 
