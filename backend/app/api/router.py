@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import attendance, auth, dashboard, groups, homework, lessons, notifications, parents, payments, student_portal, students, teacher_panel, teachers
+from app.api.endpoints import attendance, auth, dashboard, groups, homework, lessons, notifications, parents, payments, student_portal, students, teacher_panel, telegram_webhook, teachers
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -16,3 +16,4 @@ api_router.include_router(homework.router, prefix="/homework", tags=["homework"]
 api_router.include_router(teacher_panel.router, prefix="/teacher", tags=["teacher-panel"])
 api_router.include_router(student_portal.router, prefix="/student", tags=["student-portal"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["telegram"])

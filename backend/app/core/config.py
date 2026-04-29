@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str = "Admin12345"
     telegram_bot_token: str | None = None
     bot_username: str | None = None
+    backend_public_url: str | None = None
+    telegram_webhook_secret: str | None = None
     telegram_request_timeout_seconds: int = 10
     parent_bad_grade_threshold: int = 60
     parent_portal_url: str | None = None

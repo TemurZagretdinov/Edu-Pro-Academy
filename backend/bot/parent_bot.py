@@ -73,6 +73,8 @@ from bot.parent_bot_ui import (
 router = Router()
 logger = logging.getLogger(__name__)
 
+_PARENT_BOT: Bot | None = None
+_PARENT_DISPATCHER: Dispatcher | None = None
 _ACTIVE_CHILD_BY_USER: dict[str, int] = {}
 _AWAITING_CODE_USERS: set[str] = set()
 _CODE_PATTERN = re.compile(r"^[A-Za-z0-9]{6,20}$")
@@ -788,6 +790,53 @@ async def _set_commands(bot: Bot) -> None:
         logger.exception("Failed to sync Telegram bot commands")
 
 
+def create_parent_bot_dispatcher() -> Dispatcher:
+    global _PARENT_DISPATCHER
+    if _PARENT_DISPATCHER is None:
+        dispatcher = Dispatcher()
+        dispatcher.message.outer_middleware(IncomingMessageLogger())
+        dispatcher.include_router(router)
+        _PARENT_DISPATCHER = dispatcher
+    return _PARENT_DISPATCHER
+
+
+def create_parent_bot() -> Bot:
+    global _PARENT_BOT
+    if not settings.telegram_bot_token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is required to create the parent bot")
+    if _PARENT_BOT is None:
+        _PARENT_BOT = Bot(
+            token=settings.telegram_bot_token,
+            default=DefaultBotProperties(parse_mode="HTML"),
+        )
+    return _PARENT_BOT
+
+
+async def setup_parent_bot_webhook() -> None:
+    if not settings.telegram_bot_token:
+        logger.warning("TELEGRAM_BOT_TOKEN is missing; Telegram webhook was not configured")
+        return
+    if not settings.backend_public_url:
+        logger.warning("BACKEND_PUBLIC_URL is missing; Telegram webhook was not configured")
+        return
+
+    bot = create_parent_bot()
+    create_parent_bot_dispatcher()
+    await _set_commands(bot)
+    webhook_url = (
+        settings.backend_public_url.rstrip("/")
+        + settings.api_v1_prefix.rstrip("/")
+        + "/telegram/webhook"
+    )
+    await bot.set_webhook(webhook_url, secret_token=settings.telegram_webhook_secret or None)
+    logger.info("Telegram webhook set: %s", webhook_url)
+
+
+async def close_parent_bot() -> None:
+    if _PARENT_BOT is not None:
+        await _PARENT_BOT.session.close()
+
+
 @router.message(CommandStart())
 async def start(message: Message, command: CommandObject | None = None) -> None:
     _log_matched_handler("start", message)
@@ -1091,10 +1140,7 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     if not settings.telegram_bot_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is required to run the parent bot")
-    bot = Bot(
-        token=settings.telegram_bot_token,
-        default=DefaultBotProperties(parse_mode="HTML"),
-    )
+    bot = create_parent_bot()
     try:
         logger.info("Parent Telegram bot startup requested")
         await _set_commands(bot)
@@ -1102,15 +1148,13 @@ async def main() -> None:
         logger.info("Telegram webhook deleted before polling")
         print("✅ Parent Telegram bot started", flush=True)
         logger.info("✅ Parent Telegram bot started")
-        dispatcher = Dispatcher()
-        dispatcher.message.outer_middleware(IncomingMessageLogger())
-        dispatcher.include_router(router)
+        dispatcher = create_parent_bot_dispatcher()
         await dispatcher.start_polling(bot)
     except Exception:
         logger.exception("Parent Telegram bot stopped with an error")
         raise
     finally:
-        await bot.session.close()
+        await close_parent_bot()
 
 
 if __name__ == "__main__":

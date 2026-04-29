@@ -1,11 +1,12 @@
 # Production Deployment
 
-This project deploys as four separate parts:
+This project deploys as three separate parts:
 
 - Frontend: Vercel, project root `frontend`, output `dist`
 - Backend API: Render or Railway web service, project root `backend`
 - Database: managed PostgreSQL
-- Telegram parent bot: separate worker service, project root `backend`
+
+The Telegram parent bot runs through a webhook inside the FastAPI backend. No paid Render Background Worker is required for production.
 
 Never commit real `.env` files. Use `backend/.env.example` and `frontend/.env.example` as templates.
 
@@ -40,6 +41,7 @@ DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname
 FRONTEND_ORIGINS=https://your-frontend.vercel.app
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 BOT_USERNAME=your_bot_username
+BACKEND_PUBLIC_URL=https://edu-pro-academy-api.onrender.com
 ```
 
 Frontend:
@@ -48,19 +50,10 @@ Frontend:
 VITE_API_URL=https://your-backend.onrender.com/api/v1
 ```
 
-Bot worker:
-
-```env
-APP_NAME=EduPro Academy
-SECRET_KEY=replace-with-the-same-backend-secret
-DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-BOT_USERNAME=your_bot_username
-```
-
 Optional backend variables:
 
 ```env
+TELEGRAM_WEBHOOK_SECRET=replace-with-random-secret
 PARENT_PORTAL_URL=https://your-frontend.vercel.app/student/login
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 BOOTSTRAP_ADMIN_PASSWORD=replace-with-temporary-strong-password
@@ -76,11 +69,7 @@ Use a SQLAlchemy URL with the installed psycopg driver:
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/dbname
 ```
 
-Use the same `DATABASE_URL` for:
-
-- Backend web service
-- Alembic migrations
-- Telegram bot worker
+Use the same `DATABASE_URL` for the backend web service and Alembic migrations.
 
 ## Backend Deploy
 
@@ -95,10 +84,24 @@ pip install -r requirements.txt
 Start command:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
 Set all backend environment variables in the provider dashboard. `FRONTEND_ORIGINS` must contain the exact Vercel origin, without a trailing slash.
+
+On FastAPI startup, the backend sets the Telegram webhook automatically:
+
+```text
+BACKEND_PUBLIC_URL + API_V1_PREFIX + /telegram/webhook
+```
+
+For the default production values, the webhook endpoint is:
+
+```text
+https://edu-pro-academy-api.onrender.com/api/v1/telegram/webhook
+```
+
+If `TELEGRAM_WEBHOOK_SECRET` is set, the backend sends it to Telegram when registering the webhook and verifies the `X-Telegram-Bot-Api-Secret-Token` header on incoming webhook requests.
 
 Health check:
 
@@ -136,23 +139,11 @@ VITE_API_URL=https://your-backend.onrender.com/api/v1
 
 Redeploy the frontend after changing `VITE_API_URL`; Vite embeds this value at build time.
 
-## Telegram Bot Worker
+## Telegram Parent Bot
 
-Deploy the bot as a separate worker service from the `backend` directory.
+Production uses the FastAPI webhook endpoint. Do not run `python bot/parent_bot.py` on Render, and do not create a separate Render Background Worker.
 
-Install command:
-
-```bash
-pip install -r requirements.txt
-```
-
-Worker start command:
-
-```bash
-python bot/parent_bot.py
-```
-
-The bot reads `TELEGRAM_BOT_TOKEN` and `DATABASE_URL` from environment variables. It is not started inside `app.main` or the FastAPI web service.
+The bot reads `TELEGRAM_BOT_TOKEN`, `BOT_USERNAME`, `BACKEND_PUBLIC_URL`, and `DATABASE_URL` from the backend web service environment. The webhook endpoint feeds Telegram updates into the same aiogram handlers used by local polling, so `/start`, menu buttons, parent linking, inline callbacks, and notifications continue to use the existing bot code.
 
 Local development:
 
@@ -181,7 +172,10 @@ VITE_API_URL not set:
 Set `VITE_API_URL` in Vercel to the backend API base URL including `/api/v1`, then redeploy.
 
 TELEGRAM_BOT_TOKEN missing:
-Set `TELEGRAM_BOT_TOKEN` on the worker service. The bot intentionally exits when the token is missing.
+Set `TELEGRAM_BOT_TOKEN` on the backend web service. The webhook endpoint returns unavailable without it, and local polling intentionally exits when the token is missing.
+
+BACKEND_PUBLIC_URL missing:
+Set `BACKEND_PUBLIC_URL` on the backend web service, for example `https://edu-pro-academy-api.onrender.com`. Without it, the API still starts but cannot automatically register the Telegram webhook.
 
 Telegram polling conflict:
-Only one worker may poll a Telegram bot token. Stop local polling and make sure no second production worker is running. If a webhook was configured previously, this bot deletes it before polling.
+Production webhook and local polling should not run against the same bot token at the same time. The local polling script deletes the webhook before polling, so restart or redeploy the backend afterward to set the production webhook again.
