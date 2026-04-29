@@ -104,9 +104,9 @@ def build_parent_home_message(
     if payment:
         if payment.items or payment.monthly_fee > 0 or payment.current_debt > 0:
             payment_status = "✅ To'langan" if payment.current_debt <= 0 else "⚠️ Qarzdorlik bor"
-            lines.append(f"💳 To'lovlar: {payment_status}")
+            lines.append(f"💳 To‘lovlar: {payment_status}")
         else:
-            lines.append("💳 To'lovlar: hozircha ma'lumot yo'q")
+            lines.append("💳 To‘lovlar: hozircha ma'lumot yo'q")
     lines.extend(
         [
             "",

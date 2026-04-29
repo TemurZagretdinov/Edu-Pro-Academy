@@ -14,7 +14,7 @@ from aiogram import BaseMiddleware, Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
-from aiogram.types import BotCommand, CallbackQuery, ForceReply, Message, TelegramObject
+from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup, Message, TelegramObject
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -112,6 +112,7 @@ MENU_INTENTS: dict[str, set[str]] = {
     "notifications": {
         "bildirishnomalar",
         "bildirishnoma",
+        "xabar",
         "so'nggi bildirishnomalar",
         "songgi bildirishnomalar",
         "so nggi bildirishnomalar",
@@ -160,6 +161,8 @@ _NON_CODE_TEXTS = {
         SEND_CODE_TEXT,
         SETTINGS_TEXT,
         SHARE_CONTACT_TEXT,
+        "Xabarlar",
+        "Bildirishnomalar",
         "Mening farzandim",
         "So'nggi bildirishnomalar",
         "Ulash kodi yuborish",
@@ -171,8 +174,8 @@ SECTION_TITLES = {
     "attendance": "Davomat",
     "grades": "Baholar",
     "homework": "Vazifalar",
-    "payments": "To'lovlar",
-    "notifications": "Bildirishnomalar",
+    "payments": "To‘lovlar",
+    "notifications": "Xabarlar",
 }
 
 
@@ -221,15 +224,22 @@ def _resolve_active_child(user_key: str | None, context: ParentContext | None) -
 
 
 async def _answer_html(message: Message, text: str, *, reply_markup=MAIN_MENU) -> None:
+    if isinstance(reply_markup, InlineKeyboardMarkup):
+        await message.answer("Kerakli bo'limni pastdagi menyudan tanlang.", reply_markup=MAIN_MENU)
     await message.answer(text, reply_markup=reply_markup)
+
+
+async def _answer_main_html(message: Message, text: str, *, inline_markup=None) -> None:
+    await message.answer(text, reply_markup=MAIN_MENU)
+    if inline_markup is not None:
+        await message.answer("Tezkor amallar:", reply_markup=inline_markup)
 
 
 async def _show_main_menu_message(message: Message) -> None:
     _mark_awaiting_code(_user_key(message), False)
-    await _answer_html(
+    await _answer_main_html(
         message,
         "🏠 <b>Asosiy menyu</b>\n\nKerakli bo'limni pastdagi tugmalardan tanlang.",
-        reply_markup=MAIN_MENU,
     )
 
 
@@ -306,7 +316,7 @@ async def _show_home_message(message: Message) -> None:
             await _answer_html(message, build_welcome_message())
             return
         text, keyboard = _home_payload(service, user_key, context)
-        await _answer_html(message, text, reply_markup=keyboard)
+        await _answer_main_html(message, text, inline_markup=keyboard)
     except Exception:
         logger.exception("DB query failed while showing parent home user_id=%s", user_key)
         await _answer_html(message, "⚠️ <b>Xatolik yuz berdi.</b>\n\nIltimos, birozdan keyin qayta urinib ko'ring.")
@@ -675,10 +685,7 @@ async def _show_contact_request_message(message: Message) -> None:
 
 async def _ask_code(message: Message) -> None:
     _mark_awaiting_code(_user_key(message), True)
-    await message.answer(
-        build_ask_code_message(),
-        reply_markup=ForceReply(input_field_placeholder="ABCD1234", selective=True),
-    )
+    await _answer_main_html(message, build_ask_code_message())
 
 
 async def _handle_link_code(message: Message, code_text: str) -> None:
@@ -768,8 +775,8 @@ def _bot_commands() -> list[BotCommand]:
         BotCommand(command="attendance", description="Davomat"),
         BotCommand(command="grades", description="Baholar"),
         BotCommand(command="homework", description="Vazifalar"),
-        BotCommand(command="payments", description="To'lovlar"),
-        BotCommand(command="notifications", description="Bildirishnomalar"),
+        BotCommand(command="payments", description="To‘lovlar"),
+        BotCommand(command="notifications", description="Xabarlar"),
         BotCommand(command="help", description="Yordam"),
     ]
 

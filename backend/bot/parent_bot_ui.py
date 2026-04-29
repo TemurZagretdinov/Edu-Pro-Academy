@@ -9,8 +9,8 @@ CHILDREN_TEXT = "👨‍👩‍👧 Farzandlarim"
 ATTENDANCE_TEXT = "📊 Davomat"
 GRADES_TEXT = "📝 Baholar"
 HOMEWORK_TEXT = "📚 Vazifalar"
-PAYMENTS_TEXT = "💳 To'lovlar"
-NOTIFICATIONS_TEXT = "🔔 Bildirishnomalar"
+PAYMENTS_TEXT = "💳 To‘lovlar"
+NOTIFICATIONS_TEXT = "🔔 Xabarlar"
 SEND_CODE_TEXT = "🔗 Ulash kodi"
 SETTINGS_TEXT = "⚙️ Sozlamalar"
 HELP_TEXT = "🆘 Yordam"
@@ -28,6 +28,7 @@ MAIN_MENU = ReplyKeyboardMarkup(
         [KeyboardButton(text=PAYMENTS_TEXT), KeyboardButton(text=NOTIFICATIONS_TEXT)],
         [KeyboardButton(text=SEND_CODE_TEXT), KeyboardButton(text=HELP_TEXT)],
         [KeyboardButton(text=HOME_TEXT)],
+        [KeyboardButton(text=SETTINGS_TEXT)],
     ],
     resize_keyboard=True,
 )
@@ -97,7 +98,7 @@ def build_child_section_keyboard(
         ],
         [
             InlineKeyboardButton(
-                text="✅ To'lovlar" if current_section == "payments" else "💳 To'lovlar",
+                text="✅ To‘lovlar" if current_section == "payments" else "💳 To‘lovlar",
                 callback_data=f"child:{student_id}:payments",
             ),
             InlineKeyboardButton(
